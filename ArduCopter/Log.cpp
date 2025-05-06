@@ -48,7 +48,6 @@ void Copter::Log_Write_Control_Tuning()
     // get surface tracking alts
     desired_rangefinder_alt = AP::logger().quiet_nan();
 #endif
-
     struct log_Control_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_CONTROL_TUNING_MSG),
         time_us             : AP_HAL::micros64(),
@@ -386,6 +385,43 @@ void Copter::Log_Write_Guided_Attitude_Target(ModeGuided::SubMode target_type, f
     logger.WriteBlock(&pkt, sizeof(pkt));
 }
 
+void Copter::Log_Write_4DMDc()
+{
+    if (motors->armed() && ahrs.have_inertial_nav()) {
+        const auto pos_xy = inertial_nav.get_position_xy_cm() / 100.0;
+        const auto pos_d = -1 * inertial_nav.get_position_z_up_cm() / 100.0;
+        auto vel_ned = inertial_nav.get_velocity_neu_cms() / 100.0;
+        vel_ned[2] *= -1;
+
+        auto gyro = ahrs.get_gyro();
+
+        const auto time_us = AP_HAL::micros64();
+        logger.Write("POSN", "TimeUS,X,Y,Z", "Qfff",
+                     time_us,
+                     pos_xy.x,
+                     pos_xy.y,
+                     pos_d);
+        gyro = ahrs.get_gyro();
+        logger.Write("IMUN", "TimeUS,Roll,Pitch,Yaw,P,Q,R,U,V,W", "Qfffffffff",
+                     time_us,
+                     ahrs.get_roll(),
+                     ahrs.get_pitch(),
+                     ahrs.get_yaw(),
+                     gyro.x,
+                     gyro.y,
+                     gyro.z,
+                     vel_ned.x,
+                     vel_ned.y,
+                     vel_ned.z);
+        logger.Write("MOTR", "TimeUS,Th0,UR,UP,UY", "Qffff",
+                     time_us,
+                     motors->get_throttle(),
+                     motors->get_roll(),
+                     motors->get_pitch(),
+                     motors->get_yaw());
+    }
+}
+
 // type and unit information can be found in
 // libraries/AP_Logger/Logstructure.h; search for "log_Units" for
 // units and "Format characters" for field type information
@@ -526,7 +562,8 @@ const struct LogStructure Copter::log_structure[] = {
 // @Field: ClimbRt: Climb rate
 
     { LOG_GUIDED_ATTITUDE_TARGET_MSG, sizeof(log_Guided_Attitude_Target),
-      "GUIA",  "QBffffffff",    "TimeUS,Type,Roll,Pitch,Yaw,RollRt,PitchRt,YawRt,Thrust,ClimbRt", "s-dddkkk-n", "F-000000-0" , true },
+      "GUIA",  "QBffffffff",    "TimeUS,Type,Roll,Pitch,Yaw,RollRt,PitchRt,YawRt,Thrust,ClimbRt", "s-dddkkk-n", "F-000000-0" , true }
+
 };
 
 uint8_t Copter::get_num_log_structures() const

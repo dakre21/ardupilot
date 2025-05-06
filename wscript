@@ -647,6 +647,8 @@ def configure(cfg):
     cfg.remove_target_list()
     _collect_autoconfig_files(cfg)
 
+    cfg.env.append_value('INCLUDES', 'libraries/eigen')
+
 def collect_dirs_to_recurse(bld, globs, **kw):
     dirs = []
     globs = Utils.to_list(globs)

@@ -582,6 +582,7 @@ void Copter::loop_rate_logging()
     if (should_log(MASK_LOG_IMU_FAST)) {
         AP::ins().Write_IMU();
     }
+    Log_Write_4DMDc();
 }
 
 // ten_hz_logging_loop
@@ -666,6 +667,7 @@ void Copter::twentyfive_hz_logging()
         gyro_fft.write_log_messages();
     }
 #endif
+    //Log_Write_4DMDc();
 }
 #endif  // HAL_LOGGING_ENABLED
 

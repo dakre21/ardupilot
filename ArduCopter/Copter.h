@@ -872,6 +872,7 @@ private:
 
     // Log.cpp
     void Log_Write_Control_Tuning();
+    void Log_Write_4DMDc();
     void Log_Write_Attitude();
     void Log_Write_EKF_POS();
     void Log_Write_PIDS();
@@ -1072,6 +1073,7 @@ private:
 #if MODE_TURTLE_ENABLED
     ModeTurtle mode_turtle;
 #endif
+    ModeBPRL mode_bprl;
 
     // mode.cpp
     Mode *mode_from_mode_num(const Mode::Number mode);
