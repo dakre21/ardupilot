@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "Copter.h"
 #include <AP_Math/chirp.h>
 #include <AP_ExternalControl/AP_ExternalControl_config.h> // TODO why is this needed if Copter.h includes this
@@ -134,6 +136,7 @@ public:
     virtual bool allows_autotune() const { return false; }
     virtual bool allows_flip() const { return false; }
     virtual bool crash_check_enabled() const { return true; }
+    virtual bool in_bprl_mode() const { return false; }
 
 #if AP_COPTER_ADVANCED_FAILSAFE_ENABLED
     // Return the type of this mode for use by advanced failsafe
@@ -2053,6 +2056,12 @@ private:
 };
 #endif
 
+// (dakre) Mode BPRL definition below
+namespace bprl_control {
+    class PID;
+    class AttitudeControl;
+    class RateControl;
+}
 
 class ModeBPRL : public Mode {
 
@@ -2062,11 +2071,22 @@ public:
     Number mode_number() const override { return Number::BPRL; }
 
     virtual void run() override;
+    bool init(bool ignore_checks) override;
 
     bool requires_GPS() const override { return false; }
-    bool has_manual_throttle() const override { return false; }
+    bool has_manual_throttle() const override { return true; }
     bool allows_arming(AP_Arming::Method method) const override { return true; };
-    bool is_autopilot() const override { return true; }
+    bool is_autopilot() const override { return false; }
+    bool in_bprl_mode() const override { return true; }
+    
+    void set_angle(Quaternion&& attitude_quat, float&& thrust) {
+        quat_ = attitude_quat;
+        thrust_ = thrust;
+    }
+
+    void set_v(float&& v) {
+        v_ = v;
+    }
 
 protected:
 
@@ -2074,5 +2094,10 @@ protected:
     const char *name4() const override { return "BPRL"; }
 
 private:
+    std::shared_ptr<bprl_control::AttitudeControl> att_ctrl_;
+    std::shared_ptr<bprl_control::RateControl> rate_ctrl_;
 
+    Quaternion quat_;
+    float thrust_;
+    float v_;
 };

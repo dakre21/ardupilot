@@ -1208,6 +1208,29 @@ void GCS_MAVLINK_Copter::handle_message_set_attitude_target(const mavlink_messag
         mavlink_set_attitude_target_t packet;
         mavlink_msg_set_attitude_target_decode(&msg, &packet);
 
+        auto get_attitude = [&](bool ignore) -> Quaternion {
+            Quaternion attitude_quat;
+            if (ignore) {
+                attitude_quat.zero();
+            } else {
+                attitude_quat = Quaternion(packet.q[0],packet.q[1],packet.q[2],packet.q[3]);
+
+                // Do not accept the attitude_quaternion
+                // if its magnitude is not close to unit length +/- 1E-3
+                // this limit is somewhat greater than sqrt(FLT_EPSL)
+                if (!attitude_quat.is_unit_length()) {
+                    // The attitude quaternion is ill-defined
+                    return Quaternion();
+                }
+            }
+            return attitude_quat;
+        };
+
+        if (copter.flightmode->in_bprl_mode()) {
+            copter.mode_bprl.set_angle(get_attitude(false), constrain_float(packet.thrust, -1.0f, 1.0f));
+            return;
+        }
+
         // exit if vehicle is not in Guided mode or Auto-Guided mode
         if (!copter.flightmode->in_guided_mode()) {
             return;
@@ -1225,20 +1248,7 @@ void GCS_MAVLINK_Copter::handle_message_set_attitude_target(const mavlink_messag
             return;
         }
 
-        Quaternion attitude_quat;
-        if (attitude_ignore) {
-            attitude_quat.zero();
-        } else {
-            attitude_quat = Quaternion(packet.q[0],packet.q[1],packet.q[2],packet.q[3]);
-
-            // Do not accept the attitude_quaternion
-            // if its magnitude is not close to unit length +/- 1E-3
-            // this limit is somewhat greater than sqrt(FLT_EPSL)
-            if (!attitude_quat.is_unit_length()) {
-                // The attitude quaternion is ill-defined
-                return;
-            }
-        }
+        const auto attitude_quat = get_attitude(attitude_ignore);
 
         Vector3f ang_vel_body;
         if (!roll_rate_ignore && !pitch_rate_ignore && !yaw_rate_ignore) {
@@ -1655,5 +1665,45 @@ uint8_t GCS_MAVLINK_Copter::high_latency_wind_direction() const
         return wrap_360(degrees(atan2f(-wind.y, -wind.x))) / 2;
     }
     return 0;
+}
+
+void GCS_MAVLINK_Copter::handle_odometry(const mavlink_message_t &msg)
+{
+    mavlink_odometry_t m;
+    mavlink_msg_odometry_decode(&msg, &m);
+
+    if (m.frame_id == 99) {
+        auto v = m.vy;
+        copter.mode_bprl.set_v(std::move(v));
+        return;
+    }
+
+    AP_VisualOdom *visual_odom = AP::visualodom();
+    if (visual_odom == nullptr) {
+        return;
+    }
+
+    if (m.frame_id != MAV_FRAME_LOCAL_FRD ||
+        m.child_frame_id != MAV_FRAME_BODY_FRD) {
+        // only support local FRD frame data
+        return;
+    }
+
+    Quaternion q{m.q[0],m.q[1],m.q[2],m.q[3]};
+
+    float posErr = 0;
+    float angErr = 0;
+    if (!isnan(m.pose_covariance[0])) {
+        posErr = cbrtf(sq(m.pose_covariance[0])+sq(m.pose_covariance[6])+sq(m.pose_covariance[11]));
+        angErr = cbrtf(sq(m.pose_covariance[15])+sq(m.pose_covariance[18])+sq(m.pose_covariance[20]));
+    }
+
+    const uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(m.time_usec, PAYLOAD_SIZE(chan, ODOMETRY));
+    visual_odom->handle_pose_estimate(m.time_usec, timestamp_ms, m.x, m.y, m.z, q, posErr, angErr, m.reset_counter, m.quality);
+
+    // convert velocity vector from FRD to NED frame
+    Vector3f vel{m.vx, m.vy, m.vz};
+    vel = q * vel;
+    visual_odom->handle_vision_speed_estimate(m.time_usec, timestamp_ms, vel, m.reset_counter, m.quality);
 }
 #endif // HAL_HIGH_LATENCY2_ENABLED

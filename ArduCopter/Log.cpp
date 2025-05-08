@@ -393,7 +393,7 @@ void Copter::Log_Write_4DMDc()
         auto vel_ned = inertial_nav.get_velocity_neu_cms() / 100.0;
         vel_ned[2] *= -1;
 
-        auto gyro = ahrs.get_gyro();
+        auto gyro = ahrs.get_gyro_latest();
 
         const auto time_us = AP_HAL::micros64();
         logger.Write("POSN", "TimeUS,X,Y,Z", "Qfff",
@@ -401,7 +401,6 @@ void Copter::Log_Write_4DMDc()
                      pos_xy.x,
                      pos_xy.y,
                      pos_d);
-        gyro = ahrs.get_gyro();
         logger.Write("IMUN", "TimeUS,Roll,Pitch,Yaw,P,Q,R,U,V,W", "Qfffffffff",
                      time_us,
                      ahrs.get_roll(),

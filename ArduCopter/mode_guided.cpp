@@ -938,6 +938,7 @@ void ModeGuided::posvelaccel_control_run()
 // called from guided_run
 void ModeGuided::angle_control_run()
 {
+    gcs().send_text(MAV_SEVERITY_INFO, "%d", guided_angle_state.use_thrust);
     float climb_rate_cms = 0.0f;
     if (!guided_angle_state.use_thrust) {
         // constrain climb rate

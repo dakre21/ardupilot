@@ -64,6 +64,8 @@ protected:
     uint32_t log_radio_bit() const override { return MASK_LOG_PM; }
 #endif
 
+    void handle_odometry(const mavlink_message_t &msg) override;
+
 private:
 
     // sanity check velocity or acceleration vector components are numbers
